@@ -9,8 +9,6 @@ var path = require('path');
 var flash = require('connect-flash');
 var mongoose = require('mongoose');
 var passport = require('passport');
-process.env.FB_APP_ID = "1478084939075807";
-process.env.FB_APP_SECRET = "44e725291272a944516212778a18620b";
 require('./config/db'); // TODO [DB] : Connect to database
 require('./config/passport'); // TODO [FB] : Passport configuration
 
