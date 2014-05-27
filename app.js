@@ -9,12 +9,13 @@ var path = require('path');
 var flash = require('connect-flash');
 var mongoose = require('mongoose');
 var passport = require('passport');
-
-// require('./config/db'); // TODO [DB] : Connect to database
-// require('./config/passport'); // TODO [FB] : Passport configuration
+process.env.FB_APP_ID = "1478084939075807";
+process.env.FB_APP_SECRET = "44e725291272a944516212778a18620b";
+require('./config/db'); // TODO [DB] : Connect to database
+require('./config/passport'); // TODO [FB] : Passport configuration
 
 var app = express();
-// var Vote = mongoose.model('Vote'); // TODO [DB] : Get Vote model
+var Vote = mongoose.model('Vote'); // TODO [DB] : Get Vote model
 
 // all environments
 app.set('port', process.env.PORT || 3000);
@@ -26,12 +27,12 @@ app.use(express.json());
 app.use(express.urlencoded());
 app.use(express.methodOverride());
 app.use(express.cookieParser(process.env.COOKIE_SECRET));
-app.use(express.session());
+app.use(express.session({ secret: 'keyboard cat'}));
 
 // https://github.com/jaredhanson/passport#middleware
 app.use(passport.initialize());
 app.use(passport.session());
-// Session based flash messages
+// . based flash messages
 app.use(flash());
 
 app.use(app.router);
@@ -51,35 +52,32 @@ app.get('/', function(req, res){
 app.post('/vote', function(req, res, next){
   // Stores the voted option (conveted to number) into session
   req.session.vote = +req.body.vote;
-
   res.redirect('/result');
 
   /* TODO [FB] : Redirect to passport auth url! */
   // Directly invoke the passport authenticate middleware.
   // Ref: http://passportjs.org/guide/authenticate/
   //
-  // passport.authenticate('facebook')(req, res, next);
+   passport.authenticate('facebook')(req, res, next);
 });
 
 // TODO [FB]: Facebook callback handler
 // Ref: https://github.com/jaredhanson/passport-facebook/blob/master/examples/login/app.js#L100
 //
-// app.get('/fbcb', passport.authenticate('facebook', {
-//   successRedirect:'/result',
-//   failureRedirect: '/'
-// }));
+app.get('/fbcb', passport.authenticate('facebook', {
+   successRedirect:'/result',
+   failureRedirect:'/'
+ }));
 
 app.get('/result', function(req, res){
-
   var vote = req.session.vote, // The voted item (0~6)
-      fbid = "" + Math.random();    // Facebook ID. (Fake)
-      // fbid = req.user && req.user.id; // TODO [FB]: Get user from req.user
+      //fbid = "" + Math.random();    // Facebook ID. (Fake)
+      fbid = req.user && req.user.id; // TODO [FB]: Get user from req.user
 
   // Delete the stored session.
   //
   delete req.session.vote;
   req.logout(); // Delete req.user
-
   // Redirect the malicious (not voted or not logged in) requests.
   //
   if( vote === undefined || fbid === undefined ){
@@ -94,20 +92,37 @@ app.get('/result', function(req, res){
   */
 
   //
-  // var vote = new Vote({vote: vote, fbid: fbid});
-  // vote.save(function(err, newVote){
-  //   if( err ){
-  //     req.flash('info', "你已經投過票囉！");
-  //     return res.redirect('/');
-  //   }
+  var vote = new Vote({vote: vote, fbid: fbid});
+   vote.save(function(err, newVote){
+     if( err ){
+       req.flash('info', "你已經投過票囉！");
+       return res.redirect('/');
+     }
   //
   //   ... ...
   //
-       res.render('result', {
-         votes: [18.1, 12.5, 42.44445, 21.3, 1.3, 2.5, 1.85555] // Percentages
-       });
+	var tmp = [],c=0,sum=0;
+	function FIND(s){
+		//tmp[i] = Vote.find({vote:i}).count();
+		Vote.find({vote:s},function(err,datas,count){
+			if(err){
+				console.error(err);
+			}
+			tmp[s]=datas.length;
+			c++;
+			sum=sum+tmp[s];
+			if(c==7){
+				for(i=0;i<7;i++)tmp[i]=tmp[i]*100/sum;
+				res.render('result', {
+					votes: tmp // Percentages
+				});
+			}
+			else FIND(s+1);
+		});
+	}
+	FIND(0);
   //
-  // });
+   });
 
 });
 
